@@ -12,6 +12,7 @@ include(CMake/lus-cvars.cmake)
 set(SPDLOG_LEVEL_TRACE 0)
 set(SPDLOG_LEVEL_OFF 6)
 set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
+include(FetchContent)
 
 option(SUPPRESS_WARNINGS "Suppress warnings in LUS and src (decomp)" ON)
 if(SUPPRESS_WARNINGS)
@@ -81,6 +82,14 @@ add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/Zc:preprocessor>)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    # Fetch shared UWP deps
+    FetchContent_Declare(UwpLibs
+        GIT_REPOSITORY https://github.com/worleydl/uwp-dep.git
+        GIT_TAG 0cef7e0e25013f41af9acb3885f054ed38f70cdd
+    )
+    FetchContent_MakeAvailable(UwpLibs)
+
+    # Use vcpkg static for everything else
     include(CMake/automate-vcpkg.cmake)
 
     set(VCPKG_TRIPLET x64-windows-static)
@@ -166,6 +175,7 @@ set(INCLUDE_MPQ_SUPPORT ON)
 # Set CONTROLLERBUTTONS_T
 ################################################################################
 add_compile_definitions(CONTROLLERBUTTONS_T=uint32_t)
+add_compile_definitions(_UWP=1)
 
 ################################################################################
 # Sub-projects
