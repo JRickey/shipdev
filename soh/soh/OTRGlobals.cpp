@@ -121,6 +121,9 @@
 #include "soh/config/ConfigUpdaters.h"
 #include "soh/ShipInit.hpp"
 
+#ifdef _UWP
+extern "C" __declspec(dllimport) void uwp_GetScreenSize(int*, int*);
+#endif
 bool SoH_HandleConfigDrop(char* filePath);
 
 OTRGlobals* OTRGlobals::Instance;
@@ -321,8 +324,12 @@ OTRGlobals::OTRGlobals() {
         ImGui::GetIO().FontDefault = fontStandardLarger;
     }
 
-    previousImGuiScaleIndex = -1;
-    previousImGuiScale = defaultImGuiScale;
+#ifdef _UWP
+    int uwpWidth, uwpHeight;
+    uwp_GetScreenSize(&uwpWidth, &uwpHeight);
+    defaultImGuiScale = uwpHeight / 1080.0f;
+#endif
+
     ScaleImGui();
 }
 
@@ -947,17 +954,9 @@ OTRGlobals::~OTRGlobals() {
 }
 
 void OTRGlobals::ScaleImGui() {
-    int32_t imGuiScaleIndex = CVarGetInteger(CVAR_SETTING("ImGuiScale"), defaultImGuiScale);
-    if (imGuiScaleIndex == previousImGuiScaleIndex) {
-        return;
-    }
-
-    float scale = imguiScaleOptionToValue[imGuiScaleIndex];
-    float newScale = scale / previousImGuiScale;
-    ImGui::GetStyle().ScaleAllSizes(newScale);
+    // DLW: Moved to float slider for more fine tune scaling
+    float scale = CVarGetFloat(CVAR_SETTING("ImGuiScale"), defaultImGuiScale);
     ImGui::GetIO().FontGlobalScale = scale;
-    previousImGuiScale = scale;
-    previousImGuiScaleIndex = imGuiScaleIndex;
 }
 
 ImFont* OTRGlobals::CreateDefaultFontWithSize(float size) {
