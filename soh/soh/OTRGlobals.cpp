@@ -464,7 +464,7 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
         switch (extractStep) {
             case ES_PORT_ARCHIVE: {
                 if (sohArchiveVersionMatch) {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(_UWP)
                     extractStep = ES_WINDOWS;
 #elif (defined(__WIIU__) || defined(__SWITCH__))
                     extractStep = ES_VERIFY;
@@ -494,7 +494,7 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
             case ES_WINDOWS: {
                 switch (windowsStep) {
                     case WS_TEMP: {
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(_UWP)
                         char* tempVar = getenv("TEMP");
                         std::filesystem::path tempPath;
                         try {

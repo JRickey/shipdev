@@ -1,0 +1,25 @@
+From 2aef64247494031c199b5bc624b9ac873689c75c Mon Sep 17 00:00:00 2001
+From: = <danworley@gmail.com>
+Date: Wed, 22 Oct 2025 10:23:12 -0400
+Subject: [PATCH 6/7] uwp: Rebase cleanup
+
+---
+ src/fast/backends/gfx_sdl2.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
+index b7291d00..8fef1c01 100644
+--- a/src/fast/backends/gfx_sdl2.cpp
++++ b/src/fast/backends/gfx_sdl2.cpp
+@@ -706,7 +706,7 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
+         previous_time = qpc_to_100ns(SDL_GetPerformanceCounter());
+     }
+ 
+-    SDL_GL_SwapWindow(wnd);
++    SDL_GL_SwapWindow(mWnd);
+ }
+ 
+ void GfxWindowBackendSDL2::SwapBuffersEnd() {
+-- 
+2.55.0
+

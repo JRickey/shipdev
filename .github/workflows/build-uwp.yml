@@ -1,0 +1,96 @@
+name: build-uwp
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - uwp-9.2.3-rebase
+
+jobs:
+  build-uwp:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Ninja
+        shell: pwsh
+        run: choco install ninja -y
+
+      - name: Apply Xbox libultraship patches
+        shell: pwsh
+        run: |
+          Get-ChildItem patches/libultraship-uwp/*.patch |
+            Sort-Object Name |
+            ForEach-Object { git -C libultraship apply --whitespace=nowarn $_.FullName }
+
+      - name: Download verified Shipwright 9.2.3 assets
+        shell: pwsh
+        run: |
+          $url = "https://github.com/HarbourMasters/Shipwright/releases/download/9.2.3/SoH-Ackbar-Delta-Win64.zip"
+          Invoke-WebRequest -Uri $url -OutFile upstream-win64.zip
+          $actual = (Get-FileHash upstream-win64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = "cc7bd5ada1332be50013976fc3db3289cacde1df57e7e6cf73d4a1df81313e30"
+          if ($actual -ne $expected) {
+            throw "Shipwright release checksum mismatch: $actual"
+          }
+          Expand-Archive upstream-win64.zip -DestinationPath upstream-win64
+          New-Item -ItemType Directory -Force build-windows/soh | Out-Null
+          Copy-Item upstream-win64/soh.o2r build-windows/soh/soh.o2r
+
+      - name: Build Shipwright DLL
+        shell: pwsh
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+        run: |
+          cmake -S . -B build-windows -G Ninja `
+            -DCMAKE_MAKE_PROGRAM=ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DBUILD_REMOTE_CONTROL=1
+          cmake --build build-windows --config Release --parallel 10
+
+      - name: Configure UWP package
+        shell: pwsh
+        run: |
+          cmake -S uwp -B build-uwp -G "Visual Studio 17 2022" -A x64 `
+            -DSOH_BUILD_DIR="${{ github.workspace }}/build-windows" `
+            -DSOH_EXE_DIR="${{ github.workspace }}/build-windows/soh"
+
+      - name: Build and sign MSIX bundle
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate `
+            -Type Custom `
+            -Subject "CN=odolwa" `
+            -KeyUsage DigitalSignature `
+            -FriendlyName "Shipwright UWP CI" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
+          msbuild build-uwp/soh-uwp.vcxproj `
+            /p:Configuration=Release `
+            /p:Platform=x64 `
+            /p:AppxBundle=Always `
+            /p:AppxBundlePlatforms=x64 `
+            /p:UapAppxPackageBuildMode=SideloadOnly `
+            /p:AppxPackageSigningEnabled=true `
+            /p:PackageCertificateThumbprint=$($cert.Thumbprint)
+
+      - name: Upload UWP package
+        uses: actions/upload-artifact@v4
+        with:
+          name: soh-uwp-9.2.3-x64
+          if-no-files-found: error
+          path: |
+            build-uwp/AppPackages/**/*.msixbundle
+            build-uwp/AppPackages/**/*.appxbundle
+            build-uwp/AppPackages/**/*.msix
+            build-uwp/AppPackages/**/*.appx
+            build-uwp/AppPackages/**/*.cer

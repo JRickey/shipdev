@@ -175,7 +175,9 @@ set(INCLUDE_MPQ_SUPPORT ON)
 # Set CONTROLLERBUTTONS_T
 ################################################################################
 add_compile_definitions(CONTROLLERBUTTONS_T=uint32_t)
-add_compile_definitions(_UWP=1)
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    add_compile_definitions(_UWP=1)
+endif()
 
 ################################################################################
 # Sub-projects

@@ -1,0 +1,149 @@
+From 0ff0b6b2568bae42027a1f318297dc113f879633 Mon Sep 17 00:00:00 2001
+From: = <danworley@gmail.com>
+Date: Mon, 26 May 2025 15:59:11 -0400
+Subject: [PATCH 1/7] UWP: Port over SOH-9.0.2 LUS
+
+---
+ cmake/dependencies/common.cmake  |  5 +++--
+ cmake/dependencies/windows.cmake |  3 ++-
+ include/ship/Context.h           |  1 +
+ src/fast/Fast3dWindow.cpp        | 16 ++++++++++++++++
+ src/ship/Context.cpp             | 14 ++++++++++++++
+ 5 files changed, 36 insertions(+), 3 deletions(-)
+
+diff --git a/cmake/dependencies/common.cmake b/cmake/dependencies/common.cmake
+index 8f5813ac..bf489191 100644
+--- a/cmake/dependencies/common.cmake
++++ b/cmake/dependencies/common.cmake
+@@ -3,7 +3,8 @@ include(FetchContent)
+ find_package(OpenGL QUIET)
+ 
+ #=================== ImGui ===================
+-set(imgui_fixes_and_config_patch_file ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/patches/imgui-fixes-and-config.patch)
++#set(imgui_fixes_and_config_patch_file ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/patches/imgui-fixes-and-config.patch)
++set(imgui_fixes_and_config_patch_file ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/patches/imgui-patch-uwp.patch)
+ set(imgui_apply_patch_command ${CMAKE_COMMAND} -Dpatch_file=${imgui_fixes_and_config_patch_file} -Dwith_reset=TRUE -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/dependencies/git-patch.cmake)
+ 
+ FetchContent_Declare(
+@@ -110,4 +111,4 @@ FetchContent_Declare(
+     GIT_REPOSITORY https://github.com/KiritoDv/prism-processor.git
+     GIT_TAG bbcbc7e3f890a5806b579361e7aa0336acd547e7
+ )
+-FetchContent_MakeAvailable(prism)
+\ No newline at end of file
++FetchContent_MakeAvailable(prism)
+diff --git a/cmake/dependencies/windows.cmake b/cmake/dependencies/windows.cmake
+index 6b3b7b23..164a724b 100644
+--- a/cmake/dependencies/windows.cmake
++++ b/cmake/dependencies/windows.cmake
+@@ -6,7 +6,8 @@ target_sources(ImGui
+ )
+ 
+ find_package(SDL2 CONFIG REQUIRED)
+-target_link_libraries(ImGui PUBLIC SDL2::SDL2 SDL2::SDL2main)
++#target_link_libraries(ImGui PUBLIC SDL2::SDL2 SDL2::SDL2main)
++target_link_libraries(ImGui PUBLIC SDL2)
+ 
+ find_package(GLEW REQUIRED)
+ target_link_libraries(ImGui PUBLIC opengl32 GLEW::GLEW)
+diff --git a/include/ship/Context.h b/include/ship/Context.h
+index 15c69b03..aef8c531 100644
+--- a/include/ship/Context.h
++++ b/include/ship/Context.h
+@@ -43,6 +43,7 @@ class Context {
+     static std::string GetAppDirectoryPath(std::string appName = "");
+     static std::string GetPathRelativeToAppDirectory(const std::string path, std::string appName = "");
+     static std::string GetPathRelativeToAppBundle(const std::string path);
++    static std::string GetPathRelativeToAuxiliary(const std::string path);
+     static std::string LocateFileAcrossAppDirs(const std::string path, std::string appName = "");
+ 
+     Context(std::string name, std::string shortName, std::string configFilePath);
+diff --git a/src/fast/Fast3dWindow.cpp b/src/fast/Fast3dWindow.cpp
+index da8adcfd..1877b2e9 100644
+--- a/src/fast/Fast3dWindow.cpp
++++ b/src/fast/Fast3dWindow.cpp
+@@ -15,6 +15,11 @@
+ 
+ #include <fstream>
+ 
++#ifdef _UWP
++extern "C" __declspec(dllimport) float uwp_GetRefreshRate();
++extern "C" __declspec(dllimport) void  uwp_GetScreenSize(int* x, int* y);
++#endif
++
+ namespace Fast {
+ 
+ extern void GfxSetInstance(std::shared_ptr<Interpreter> gfx);
+@@ -88,8 +93,15 @@ void Fast3dWindow::Init() {
+         width = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Fullscreen.Width", gameMode ? 1280 : 1920);
+         height = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Fullscreen.Height", gameMode ? 800 : 1080);
+     } else {
++#ifndef _UWP
+         width = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Width", 640);
+         height = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Height", 480);
++#else
++	int x, y;
++	uwp_GetScreenSize(&x, &y);
++        width = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Width", x);
++        height = Ship::Context::GetInstance()->GetConfig()->GetInt("Window.Height", y);
++#endif
+     }
+     Ship::Context::GetInstance()->GetWindow()->SetFullscreenScancode(
+         Ship::Context::GetInstance()->GetConfig()->GetInt("Shortcuts.Fullscreen", Ship::KbScancode::LUS_KB_F11));
+@@ -287,9 +299,13 @@ bool Fast3dWindow::IsMouseCaptured() {
+ }
+ 
+ uint32_t Fast3dWindow::GetCurrentRefreshRate() {
++#ifndef UWP
+     uint32_t refreshRate;
+     mWindowManagerApi->GetActiveWindowRefreshRate(&refreshRate);
+     return refreshRate;
++#else
++    return std::ceil(uwp_GetRefreshRate());
++#endif
+ }
+ 
+ bool Fast3dWindow::SupportsWindowedFullscreen() {
+diff --git a/src/ship/Context.cpp b/src/ship/Context.cpp
+index 88ab1826..2e25d9d0 100644
+--- a/src/ship/Context.cpp
++++ b/src/ship/Context.cpp
+@@ -142,7 +142,11 @@ bool Context::InitLogging(spdlog::level::level_enum debugBuildLogLevel,
+         sinks.push_back(systemConsoleSink);
+ #endif
+ 
++#ifndef _UWP
+         auto logPath = GetPathRelativeToAppDirectory(("logs/" + GetName() + ".log"));
++#else
++        auto logPath = GetPathRelativeToAuxiliary(("logs/" + GetName() + ".log"));
++#endif
+         auto fileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(logPath, 1024 * 1024 * 10, 10);
+         sinks.push_back(fileSink);
+ #ifdef _DEBUG
+@@ -503,6 +507,10 @@ std::string Context::GetPathRelativeToAppBundle(const std::string path) {
+     return GetAppBundlePath() + "/" + path;
+ }
+ 
++std::string Context::GetPathRelativeToAuxiliary(const std::string path) {
++    return std::string("E:/soh/") + path;
++}
++
+ std::string Context::GetPathRelativeToAppDirectory(const std::string path, std::string appName) {
+     return GetAppDirectoryPath(appName) + "/" + path;
+ }
+@@ -520,6 +528,12 @@ std::string Context::LocateFileAcrossAppDirs(const std::string path, std::string
+     if (std::filesystem::exists(fpath)) {
+         return fpath;
+     }
++
++    fpath = GetPathRelativeToAuxiliary(path);
++    if (std::filesystem::exists(fpath)) {
++        return fpath;
++    }
++
+     // current dir
+     return "./" + std::string(path);
+ }
+-- 
+2.55.0
+

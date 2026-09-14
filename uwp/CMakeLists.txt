@@ -102,4 +102,10 @@ set(BinLibs
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${BinLibs})
-set_target_properties(${PROJECT_NAME} PROPERTIES VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.19041.0)
+set_target_properties(${PROJECT_NAME} PROPERTIES
+	VS_WINDOWS_TARGET_PLATFORM_MIN_VERSION 10.0.19041.0
+	VS_GLOBAL_AppxPackage true
+	VS_GLOBAL_AppxBundle Always
+	VS_GLOBAL_AppxBundlePlatforms x64
+	VS_GLOBAL_UapAppxPackageBuildMode SideloadOnly
+)

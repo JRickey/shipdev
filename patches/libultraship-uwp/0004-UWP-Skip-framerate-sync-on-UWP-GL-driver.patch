@@ -1,0 +1,48 @@
+From 42a9d79c95d2cf7cf140194e919ad3563dea4393 Mon Sep 17 00:00:00 2001
+From: = <danworley@gmail.com>
+Date: Mon, 26 May 2025 19:06:00 -0400
+Subject: [PATCH 4/7] UWP: Skip framerate sync on UWP GL driver
+
+---
+ src/fast/backends/gfx_sdl2.cpp | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/fast/backends/gfx_sdl2.cpp b/src/fast/backends/gfx_sdl2.cpp
+index ea133193..b7291d00 100644
+--- a/src/fast/backends/gfx_sdl2.cpp
++++ b/src/fast/backends/gfx_sdl2.cpp
+@@ -44,7 +44,12 @@
+ LONG_PTR SDL_WndProc;
+ #endif
+ 
++#ifdef _UWP
++extern "C" __declspec(dllimport) float uwp_GetRefreshRate();
++#endif
++
+ namespace Fast {
++
+ const SDL_Scancode lus_to_sdl_table[] = {
+     SDL_SCANCODE_UNKNOWN,
+     SDL_SCANCODE_ESCAPE,
+@@ -692,8 +697,16 @@ void GfxWindowBackendSDL2::SwapBuffersBegin() {
+         SDL_RenderSetVSync(mRenderer, mVsyncEnabled ? 1 : 0);
+     }
+ 
+-    SyncFramerateWithTime();
+-    SDL_GL_SwapWindow(mWnd);
++    // DLW: No need to sync on timer if target matches host refresh
++    // -> Might be UWP specific since vsync is forced on inside mesa driver
++    // -> Have noticed imgui framerate glitches out when skipping sync but also gets rid of microstutters
++    if (abs(mTargetFps - uwp_GetRefreshRate()) >= 1) {
++        SyncFramerateWithTime();
++    } else {
++        previous_time = qpc_to_100ns(SDL_GetPerformanceCounter());
++    }
++
++    SDL_GL_SwapWindow(wnd);
+ }
+ 
+ void GfxWindowBackendSDL2::SwapBuffersEnd() {
+-- 
+2.55.0
+
