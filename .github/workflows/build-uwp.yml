@@ -8,7 +8,10 @@ on:
 
 jobs:
   build-uwp:
-    runs-on: windows-latest
+    # The UWP project is a Visual Studio 2022 project. `windows-latest` moved to
+    # Visual Studio 2026, whose CMake image no longer includes the VS 17
+    # generator, so keep this build on the matching toolchain.
+    runs-on: windows-2022
 
     steps:
       - name: Check out source
@@ -24,6 +27,14 @@ jobs:
       - name: Install Ninja
         shell: pwsh
         run: choco install ninja -y
+
+      - name: Cache native dependencies and objects
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            build-windows
+          key: ${{ runner.os }}-vs2022-soh-uwp-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/CMakeLists.txt', 'libultraship/cmake/**', 'patches/libultraship-uwp/**') }}
 
       - name: Apply Xbox libultraship patches
         shell: pwsh
