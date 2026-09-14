@@ -28,13 +28,14 @@ jobs:
         shell: pwsh
         run: choco install ninja -y
 
-      - name: Cache native dependencies and objects
-        uses: actions/cache@v4
+      - name: Restore native dependencies and objects
+        id: native-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             vcpkg
             build-windows
-          key: ${{ runner.os }}-vs2022-soh-uwp-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'libultraship/CMakeLists.txt', 'libultraship/cmake/**', 'patches/libultraship-uwp/**') }}
+          key: ${{ runner.os }}-vs2022-soh-uwp-${{ hashFiles('CMakeLists.txt', 'CMake/**', 'soh/**', 'include/**', 'libultraship/**', 'patches/libultraship-uwp/**') }}
 
       - name: Apply Xbox libultraship patches
         shell: pwsh
@@ -67,6 +68,20 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_REMOTE_CONTROL=1
           cmake --build build-windows --config Release --parallel 10
+          # The main project deliberately writes its DLL/import library to the
+          # repository-level x64/Release directory. Stage those beside soh.o2r
+          # so the standalone UWP wrapper has one complete dependency folder.
+          Copy-Item x64/Release/soh.dll build-windows/soh/soh.dll
+          Copy-Item x64/Release/soh.lib build-windows/soh/soh.lib
+
+      - name: Save native dependencies and objects
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            vcpkg
+            build-windows
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
 
       - name: Configure UWP package
         shell: pwsh
