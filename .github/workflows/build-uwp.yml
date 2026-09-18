@@ -8,6 +8,14 @@ on:
         required: false
         default: false
         type: boolean
+      actions_public_key:
+        description: Repository Actions public key used to seal the generated PFX
+        required: false
+        type: string
+      actions_public_key_id:
+        description: Repository Actions public key identifier
+        required: false
+        type: string
   push:
     branches:
       - uwp-9.2.3-rebase
@@ -27,12 +35,13 @@ jobs:
       - name: Generate and seal Windows-native certificate
         shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          ACTIONS_PUBLIC_KEY: ${{ inputs.actions_public_key }}
+          ACTIONS_PUBLIC_KEY_ID: ${{ inputs.actions_public_key_id }}
           SEALED_ACTIONS_SECRET_OUTPUT: ${{ runner.temp }}/Ship-of-Harkinian-UWP-sealed-secret.json
           UWP_SIGNING_PFX_PASSWORD: ${{ secrets.UWP_SIGNING_PFX_PASSWORD }}
         run: |
-          if (-not $env:UWP_SIGNING_PFX_PASSWORD) {
-            throw "UWP_SIGNING_PFX_PASSWORD is required to rotate the signing certificate."
+          if (-not $env:UWP_SIGNING_PFX_PASSWORD -or -not $env:ACTIONS_PUBLIC_KEY -or -not $env:ACTIONS_PUBLIC_KEY_ID) {
+            throw "The signing password and repository Actions public-key inputs are required."
           }
           python -m pip install pynacl
           $pfxPath = Join-Path $env:RUNNER_TEMP "Ship-of-Harkinian-UWP.pfx"

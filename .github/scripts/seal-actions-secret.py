@@ -8,8 +8,6 @@ import base64
 import json
 import os
 import sys
-import urllib.request
-
 from nacl.public import PublicKey, SealedBox
 
 
@@ -17,18 +15,10 @@ def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: seal-actions-secret.py CERTIFICATE.pfx")
 
-    repository = os.environ["GITHUB_REPOSITORY"]
-    token = os.environ["GITHUB_TOKEN"]
-    request = urllib.request.Request(
-        f"https://api.github.com/repos/{repository}/actions/secrets/public-key",
-        headers={
-            "Accept": "application/vnd.github+json",
-            "Authorization": f"Bearer {token}",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
-    )
-    with urllib.request.urlopen(request) as response:
-        public_key = json.load(response)
+    public_key = {
+        "key": os.environ["ACTIONS_PUBLIC_KEY"],
+        "key_id": os.environ["ACTIONS_PUBLIC_KEY_ID"],
+    }
 
     with open(sys.argv[1], "rb") as pfx_file:
         secret_value = base64.b64encode(pfx_file.read())
