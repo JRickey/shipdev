@@ -2,6 +2,12 @@ name: build-uwp
 
 on:
   workflow_dispatch:
+    inputs:
+      rotate_signing_certificate:
+        description: Generate and export a new Windows-native signing certificate
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - uwp-9.2.3-rebase
@@ -95,8 +101,24 @@ jobs:
         env:
           UWP_SIGNING_PFX_BASE64: ${{ secrets.UWP_SIGNING_PFX_BASE64 }}
           UWP_SIGNING_PFX_PASSWORD: ${{ secrets.UWP_SIGNING_PFX_PASSWORD }}
+          ROTATE_SIGNING_CERTIFICATE: ${{ github.event_name == 'workflow_dispatch' && inputs.rotate_signing_certificate }}
         run: |
-          if ($env:UWP_SIGNING_PFX_BASE64 -and $env:UWP_SIGNING_PFX_PASSWORD) {
+          if ($env:ROTATE_SIGNING_CERTIFICATE -eq "true") {
+            if (-not $env:UWP_SIGNING_PFX_PASSWORD) {
+              throw "UWP_SIGNING_PFX_PASSWORD is required to rotate the signing certificate."
+            }
+            $cert = New-SelfSignedCertificate `
+              -Type Custom `
+              -Subject "CN=odolwa" `
+              -KeyUsage DigitalSignature `
+              -FriendlyName "Ship of Harkinian UWP CI" `
+              -CertStoreLocation "Cert:\CurrentUser\My" `
+              -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
+            New-Item -ItemType Directory -Force signing-output | Out-Null
+            $securePassword = ConvertTo-SecureString $env:UWP_SIGNING_PFX_PASSWORD -AsPlainText -Force
+            Export-PfxCertificate -Cert $cert -FilePath signing-output/Ship-of-Harkinian-UWP.pfx `
+              -Password $securePassword | Out-Null
+          } elseif ($env:UWP_SIGNING_PFX_BASE64 -and $env:UWP_SIGNING_PFX_PASSWORD) {
             $pfxPath = Join-Path $env:RUNNER_TEMP "Ship-of-Harkinian-UWP.pfx"
             [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:UWP_SIGNING_PFX_BASE64))
             $securePassword = ConvertTo-SecureString $env:UWP_SIGNING_PFX_PASSWORD -AsPlainText -Force
@@ -120,6 +142,14 @@ jobs:
             /p:UapAppxPackageBuildMode=SideloadOnly `
             /p:AppxPackageSigningEnabled=true `
             /p:PackageCertificateThumbprint=$($cert.Thumbprint)
+
+      - name: Upload rotated signing certificate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.rotate_signing_certificate }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ship-of-Harkinian-UWP-signing-certificate
+          if-no-files-found: error
+          path: signing-output/Ship-of-Harkinian-UWP.pfx
 
       - name: Upload UWP package
         uses: actions/upload-artifact@v4
