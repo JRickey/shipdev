@@ -1,8 +1,8 @@
-# Shipwright 9.2.3 UWP rebase
+# Ship of Harkinian UWP
 
-This branch replays the Xbox/UWP integration from `worleydl/shipdev` onto
-Shipwright 9.2.3. The working package uses a separate identity,
-`ShipwrightRebased`, so it can be installed beside the known-good 9.1.0 port.
+This branch carries the Xbox/UWP integration on Shipwright 9.2.3. The package
+uses the stable identity `ShipOfHarkinian` and the user-facing name
+`Ship of Harkinian`.
 
 The upstream 9.2.3 `libultraship` revision remains recorded as the submodule
 commit. The seven small UWP changes are kept as patches in

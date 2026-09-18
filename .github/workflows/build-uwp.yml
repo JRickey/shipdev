@@ -112,7 +112,7 @@ jobs:
       - name: Upload UWP package
         uses: actions/upload-artifact@v4
         with:
-          name: soh-uwp-9.2.3-x64
+          name: Ship-of-Harkinian-UWP-x64
           if-no-files-found: error
           path: |
             build-uwp/AppPackages/**/*.msixbundle
