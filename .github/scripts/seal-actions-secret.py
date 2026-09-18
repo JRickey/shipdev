@@ -36,7 +36,12 @@ def main() -> None:
     sealed_box = SealedBox(PublicKey(base64.b64decode(public_key["key"])))
     encrypted_value = base64.b64encode(sealed_box.encrypt(secret_value)).decode("ascii")
     payload = {"key_id": public_key["key_id"], "encrypted_value": encrypted_value}
-    print("ROTATED_ACTIONS_SECRET=" + json.dumps(payload, separators=(",", ":")))
+    output_path = os.environ.get("SEALED_ACTIONS_SECRET_OUTPUT")
+    if not output_path:
+        raise SystemExit("SEALED_ACTIONS_SECRET_OUTPUT is required")
+    with open(output_path, "w", encoding="utf-8") as output_file:
+        json.dump(payload, output_file, separators=(",", ":"))
+    print(f"Signing certificate sealed for repository key {public_key['key_id']}")
 
 
 if __name__ == "__main__":
